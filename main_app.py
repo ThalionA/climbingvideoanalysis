@@ -52,7 +52,10 @@ def process_video(video_file):
                 
                 for result in results:
                     mp_drawing.draw_landmarks(frame, result.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                    out.write(frame)
+
+                # Convert RGB back to BGR before writing 
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                out.write(frame)
                 
                 frames_processed += 1
                 elapsed_time = time.time() - start_time
