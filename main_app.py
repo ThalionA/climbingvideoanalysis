@@ -27,6 +27,11 @@ def process_video(video_file):
     start_time = time.time()
     frames_processed = 0
     
+    # Create placeholders for dynamic updates
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
+    eta_text = st.empty()
+    
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
             ret, frame = cap.read()
@@ -52,11 +57,11 @@ def process_video(video_file):
             estimated_total_time = (elapsed_time / frames_processed) * frame_count
             remaining_time = estimated_total_time - elapsed_time
 
-            # Display progress with ETA
-            st.progress(frames_processed / frame_count)
-            st.write(f"Processing video... {frames_processed}/{frame_count} frames processed.")
-            st.write(f"Estimated time remaining: {int(remaining_time)} seconds")
-
+            # Update progress bar and text
+            progress_bar.progress(frames_processed / frame_count)
+            progress_text.text(f"Processing video... {frames_processed}/{frame_count} frames processed.")
+            eta_text.text(f"Estimated time remaining: {int(remaining_time)} seconds")
+    
     cap.release()
     out.release()
 
