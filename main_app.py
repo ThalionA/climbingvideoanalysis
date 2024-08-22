@@ -5,6 +5,7 @@ import mediapipe as mp
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -14,7 +15,7 @@ def process_frame(pose, frame_rgb):
     results = pose.process(frame_rgb)
     return results
 
-def process_video(video_file, output_file_name, progress_bar, progress_text):
+def process_video(video_file, output_file_name, progress_queue):
     tfile = tempfile.NamedTemporaryFile(delete=False)
     tfile.write(video_file.read())
     cap = cv2.VideoCapture(tfile.name)
@@ -55,11 +56,13 @@ def process_video(video_file, output_file_name, progress_bar, progress_text):
             out.write(frame)
             
             frames_processed += 1
-            progress_bar.progress(frames_processed / frame_count)
-            progress_text.text(f"Processing video... {frames_processed}/{frame_count} frames processed.")
+            progress = frames_processed / frame_count
+            progress_queue.put(progress)
     
     cap.release()
     out.release()
+    progress_queue.put(1.0)  # Ensure the progress reaches 100%
+
 
 def main():
     st.title("Dual Video Pose Analysis")
@@ -73,35 +76,44 @@ def main():
         st.video(video_file2)
         
         if st.button("Analyze Videos"):
-            # Processing progress bars and text
-            st.write("Processing Video 1")
+            # Progress bars and queues for progress updates
+            progress_queue1 = Queue()
+            progress_queue2 = Queue()
             progress_bar1 = st.progress(0)
             progress_text1 = st.empty()
-            
-            st.write("Processing Video 2")
             progress_bar2 = st.progress(0)
             progress_text2 = st.empty()
             
-            with st.spinner('Processing videos...'):
-                # Process both videos
-                output_file1 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
-                output_file2 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
+            def update_progress(progress_queue, progress_bar, progress_text):
+                while True:
+                    progress = progress_queue.get()
+                    if progress is None:
+                        break
+                    progress_bar.progress(progress)
+                    progress_text.text(f"Processing... {int(progress * 100)}% completed.")
+            
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future1 = executor.submit(process_video, video_file1, tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name, progress_queue1)
+                future2 = executor.submit(process_video, video_file2, tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name, progress_queue2)
                 
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    future1 = executor.submit(process_video, video_file1, output_file1, progress_bar1, progress_text1)
-                    future2 = executor.submit(process_video, video_file2, output_file2, progress_bar2, progress_text2)
-                    
-                    future1.result()
-                    future2.result()
+                executor.submit(update_progress, progress_queue1, progress_bar1, progress_text1)
+                executor.submit(update_progress, progress_queue2, progress_bar2, progress_text2)
+                
+                future1.result()  # Wait for first video to finish
+                future2.result()  # Wait for second video to finish
+
+            # Close the progress queues
+            progress_queue1.put(None)
+            progress_queue2.put(None)
             
             st.success("Videos processed successfully!")
             
             # Display the processed videos side by side
             col1, col2 = st.columns(2)
             with col1:
-                st.video(output_file1)
+                st.video(future1.result())
             with col2:
-                st.video(output_file2)
+                st.video(future2.result())
 
     st.sidebar.header("Analysis Options")
     speed = st.sidebar.slider("Playback Speed", min_value=0.25, max_value=2.0, value=1.0, step=0.25)
