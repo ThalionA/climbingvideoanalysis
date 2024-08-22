@@ -6,10 +6,17 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+import tensorflow as tf
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
+
+def check_gpu():
+    if tf.test.is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
+        return "GPU is available and will be used for processing."
+    else:
+        return "No GPU found. Processing will be done on CPU."
 
 def process_frame(pose, frame_rgb):
     results = pose.process(frame_rgb)
@@ -35,7 +42,6 @@ def process_video(video_file, output_file_name, progress_queue):
     out = cv2.VideoWriter(output_file_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
     frames_processed = 0
-    start_time = time.time()
 
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
@@ -65,7 +71,11 @@ def process_video(video_file, output_file_name, progress_queue):
 
 
 def main():
-    st.title("Dual Video Pose Analysis")
+    st.title("Dual Video Pose Analysis with GPU Acceleration")
+    
+    # Check for GPU availability
+    gpu_message = check_gpu()
+    st.write(gpu_message)
     
     # Upload two videos
     video_file1 = st.file_uploader("Choose the first video file", type=["mp4", "mov", "avi"], key="video1")
