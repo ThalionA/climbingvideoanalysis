@@ -14,7 +14,7 @@ def process_frame(pose, frame_rgb):
     results = pose.process(frame_rgb)
     return results
 
-def process_video(video_file):
+def process_video(video_file, progress_container):
     tfile = tempfile.NamedTemporaryFile(delete=False)
     tfile.write(video_file.read())
     cap = cv2.VideoCapture(tfile.name)
@@ -33,10 +33,6 @@ def process_video(video_file):
     
     start_time = time.time()
     frames_processed = 0
-    
-    progress_bar = st.progress(0)
-    progress_text = st.empty()
-    eta_text = st.empty()
 
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -51,20 +47,16 @@ def process_video(video_file):
                 results = [f.result() for f in futures]
                 
                 for result in results:
-                    mp_drawing.draw_landmarks(frame, result.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                    if result.pose_landmarks:
+                        mp_drawing.draw_landmarks(frame, result.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
                 # Convert RGB back to BGR before writing 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 out.write(frame)
                 
                 frames_processed += 1
-                elapsed_time = time.time() - start_time
-                estimated_total_time = (elapsed_time / frames_processed) * frame_count
-                remaining_time = estimated_total_time - elapsed_time
-                
-                progress_bar.progress(frames_processed / frame_count)
-                progress_text.text(f"Processing video... {frames_processed}/{frame_count} frames processed.")
-                eta_text.text(f"Estimated time remaining: {int(remaining_time)} seconds")
+                progress = frames_processed / frame_count
+                progress_container.progress(progress)
     
     cap.release()
     out.release()
@@ -72,24 +64,34 @@ def process_video(video_file):
     return out_file_name
 
 def main():
-    st.title("Climbing Video Analysis")
-    uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi"])
+    st.title("Side-by-Side Climbing Video Analysis")
+    uploaded_file1 = st.file_uploader("Choose the first video file", type=["mp4", "mov", "avi"], key="file1")
+    uploaded_file2 = st.file_uploader("Choose the second video file", type=["mp4", "mov", "avi"], key="file2")
     
-    if uploaded_file is not None:
-        st.video(uploaded_file)
+    if uploaded_file1 is not None and uploaded_file2 is not None:
+        st.video(uploaded_file1)
+        st.video(uploaded_file2)
         
-        if st.button("Analyze Video"):
-            with st.spinner('Processing video...'):
-                processed_video_path = process_video(uploaded_file)
-            
-            st.success("Video processed successfully!")
-            
-            # Display the processed video
-            st.video(processed_video_path)
+        if st.button("Analyze Videos"):
+            with st.spinner('Processing videos...'):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.text("Processing first video")
+                    progress_container1 = st.empty()
+                    processed_video_path1 = process_video(uploaded_file1, progress_container1)
+                    st.video(processed_video_path1)
+                
+                with col2:
+                    st.text("Processing second video")
+                    progress_container2 = st.empty()
+                    processed_video_path2 = process_video(uploaded_file2, progress_container2)
+                    st.video(processed_video_path2)
+
+            st.success("Videos processed successfully!")
 
     st.sidebar.header("Analysis Options")
     speed = st.sidebar.slider("Playback Speed", min_value=0.25, max_value=2.0, value=1.0, step=0.25)
-    st.sidebar.checkbox("Enable Side-by-Side Comparison")
+    st.sidebar.checkbox("Enable Side-by-Side Comparison", value=True)
 
 if __name__ == "__main__":
     main()
