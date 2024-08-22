@@ -1,2 +1,6 @@
+streamlit
 opencv-python-headless
+numpy
 mediapipe
+torch==2.0.1+cpu  # Or torch==2.0.1+cu117 for GPU
+torchvision==0.15.2+cpu  # Or torchvision==0.15.2+cu117 for GPU
