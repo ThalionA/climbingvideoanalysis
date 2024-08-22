@@ -6,14 +6,14 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
-import tensorflow as tf
+import torch
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
 def check_gpu():
-    if tf.test.is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
+    if torch.cuda.is_available():
         return "GPU is available and will be used for processing."
     else:
         return "No GPU found. Processing will be done on CPU."
