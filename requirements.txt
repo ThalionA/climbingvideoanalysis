@@ -1,4 +1,4 @@
-opencv-python-headless
-mediapipe
 torch
 torchvision
+opencv-python-headless
+mediapipe
